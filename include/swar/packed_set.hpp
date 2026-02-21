@@ -1,48 +1,48 @@
 #pragma once
 
 #include "packed_word.hpp"
-#include <vector>
+#include <array>
 
 namespace swar {
 
-/// A dynamically-sized set of N-bit integers, stored as a sequence of
-/// PackedWord<N> instances. Each word holds up to PackedWord<N>::lanes
-/// elements. Empty lanes are represented by zero, so the stored values
-/// must be in [1, max_safe_value] to distinguish "empty" from "present".
+/// A fixed-capacity set of N-bit integers, stored as a compile-time-sized
+/// array of PackedWord<N> instances. Capacity is the maximum number of
+/// elements the set can hold.
+///
+/// Each word holds up to PackedWord<N>::lanes elements. Empty lanes are
+/// represented by zero, so stored values must be in [1, max_safe_value].
 ///
 /// This is a simple flat container — not hash-based, not sorted.
-/// Suitable for small-to-medium sets where SWAR search is fast enough.
-template <unsigned N>
+/// Suitable for small sets where SWAR search is fast enough.
+template <unsigned N, std::size_t Capacity>
 class PackedSet {
+    static_assert(Capacity > 0, "Capacity must be > 0");
+
   public:
     using Word = PackedWord<N>;
     static constexpr unsigned lanes_per_word = Word::lanes;
+    static constexpr std::size_t num_words =
+        (Capacity + lanes_per_word - 1) / lanes_per_word;
+    static constexpr std::size_t capacity = Capacity;
 
-    PackedSet() = default;
+    constexpr PackedSet() noexcept : words_{} {}
 
     /// Insert a value into the set. Returns true if inserted,
-    /// false if already present.
+    /// false if already present or full.
     /// v must be in [1, Word::max_safe_value] (0 is reserved as "empty").
     bool insert(uint64_t v) {
         assert(v >= 1 && v <= Word::max_safe_value);
-        // Check if already present
         if (contains(v))
             return false;
-        // Find a word with a free (zero) lane
         for (auto &w : words_) {
             int idx = w.find_zero();
             if (idx >= 0) {
                 w = w.set(static_cast<unsigned>(idx), v);
-                ++size_;
                 return true;
             }
         }
-        // All words full — add a new one
-        Word fresh;
-        fresh = fresh.set(0, v);
-        words_.push_back(fresh);
-        ++size_;
-        return true;
+        // All words full — set is at capacity
+        return false;
     }
 
     /// Remove a value from the set. Returns true if it was present.
@@ -52,7 +52,6 @@ class PackedSet {
             int idx = w.find(v);
             if (idx >= 0) {
                 w = w.set(static_cast<unsigned>(idx), 0);
-                --size_;
                 return true;
             }
         }
@@ -69,21 +68,19 @@ class PackedSet {
         return false;
     }
 
-    /// Number of elements in the set.
-    std::size_t size() const noexcept { return size_; }
+    /// Fixed capacity of the set.
+    static constexpr std::size_t size() noexcept { return capacity; }
 
-    /// True if the set is empty.
-    bool empty() const noexcept { return size_ == 0; }
-
-    /// Number of PackedWords in use.
-    std::size_t word_count() const noexcept { return words_.size(); }
+    /// Number of PackedWords backing this set.
+    static constexpr std::size_t word_count() noexcept { return num_words; }
 
     /// Direct access to underlying words (for inspection / benchmarking).
-    const std::vector<Word> &words() const noexcept { return words_; }
+    const std::array<Word, num_words> &words() const noexcept {
+        return words_;
+    }
 
   private:
-    std::vector<Word> words_;
-    std::size_t size_ = 0;
+    std::array<Word, num_words> words_;
 };
 
 } // namespace swar

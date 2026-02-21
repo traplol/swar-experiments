@@ -361,6 +361,112 @@ static void BM_Erase_Array(benchmark::State &state) {
 }
 
 // ============================================================
+// MEMORY benchmarks — measure bytes used by each container
+// Uses a tracking allocator for heap containers.
+// ============================================================
+
+static thread_local std::size_t g_alloc_bytes = 0;
+
+template <typename T>
+struct TrackingAllocator {
+    using value_type = T;
+    TrackingAllocator() = default;
+    template <typename U>
+    TrackingAllocator(const TrackingAllocator<U> &) noexcept {}
+    T *allocate(std::size_t n) {
+        g_alloc_bytes += n * sizeof(T);
+        return std::allocator<T>{}.allocate(n);
+    }
+    void deallocate(T *p, std::size_t n) noexcept {
+        std::allocator<T>{}.deallocate(p, n);
+    }
+    template <typename U>
+    bool operator==(const TrackingAllocator<U> &) const noexcept { return true; }
+    template <typename U>
+    bool operator!=(const TrackingAllocator<U> &) const noexcept { return false; }
+};
+
+static void BM_Memory_PackedSet(benchmark::State &state) {
+    SET_COUNTERS(state);
+    using PS = PackedSet<N, kSize>;
+    state.counters["bytes"] = sizeof(PS);
+    for (auto _ : state) {
+        PS s;
+        for (auto v : kVals) s.insert(v);
+        benchmark::DoNotOptimize(s);
+    }
+}
+
+static void BM_Memory_StdSet(benchmark::State &state) {
+    SET_COUNTERS(state);
+    for (auto _ : state) {
+        g_alloc_bytes = 0;
+        std::set<uint16_t, std::less<uint16_t>, TrackingAllocator<uint16_t>> s;
+        for (auto v : kVals) s.insert(v);
+        benchmark::DoNotOptimize(s);
+        state.counters["bytes"] = sizeof(s) + g_alloc_bytes;
+    }
+}
+
+static void BM_Memory_UnorderedSet(benchmark::State &state) {
+    SET_COUNTERS(state);
+    for (auto _ : state) {
+        g_alloc_bytes = 0;
+        std::unordered_set<uint16_t, std::hash<uint16_t>, std::equal_to<uint16_t>,
+                           TrackingAllocator<uint16_t>> s;
+        for (auto v : kVals) s.insert(v);
+        benchmark::DoNotOptimize(s);
+        state.counters["bytes"] = sizeof(s) + g_alloc_bytes;
+    }
+}
+
+static void BM_Memory_Vector(benchmark::State &state) {
+    SET_COUNTERS(state);
+    for (auto _ : state) {
+        g_alloc_bytes = 0;
+        std::vector<uint16_t, TrackingAllocator<uint16_t>> s;
+        for (auto v : kVals) {
+            if (std::find(s.begin(), s.end(), v) == s.end())
+                s.push_back(v);
+        }
+        benchmark::DoNotOptimize(s);
+        state.counters["bytes"] = sizeof(s) + g_alloc_bytes;
+    }
+}
+
+static void BM_Memory_SortedVector(benchmark::State &state) {
+    SET_COUNTERS(state);
+    for (auto _ : state) {
+        g_alloc_bytes = 0;
+        std::vector<uint16_t, TrackingAllocator<uint16_t>> s;
+        for (auto v : kVals) {
+            auto it = std::lower_bound(s.begin(), s.end(), v);
+            if (it == s.end() || *it != v)
+                s.insert(it, v);
+        }
+        benchmark::DoNotOptimize(s);
+        state.counters["bytes"] = sizeof(s) + g_alloc_bytes;
+    }
+}
+
+static void BM_Memory_Array(benchmark::State &state) {
+    SET_COUNTERS(state);
+    state.counters["bytes"] = sizeof(std::array<uint16_t, kSize>);
+    for (auto _ : state) {
+        std::array<uint16_t, kSize> arr{};
+        std::size_t count = 0;
+        for (auto v : kVals) {
+            bool found = false;
+            for (std::size_t i = 0; i < count; ++i) {
+                if (arr[i] == v) { found = true; break; }
+            }
+            if (!found) arr[count++] = v;
+        }
+        benchmark::DoNotOptimize(arr);
+    }
+}
+
+// ============================================================
 // Register all benchmarks
 // ============================================================
 
@@ -391,3 +497,10 @@ BENCHMARK(BM_Erase_UnorderedSet);
 BENCHMARK(BM_Erase_Vector);
 BENCHMARK(BM_Erase_SortedVector);
 BENCHMARK(BM_Erase_Array);
+
+BENCHMARK(BM_Memory_PackedSet);
+BENCHMARK(BM_Memory_StdSet);
+BENCHMARK(BM_Memory_UnorderedSet);
+BENCHMARK(BM_Memory_Vector);
+BENCHMARK(BM_Memory_SortedVector);
+BENCHMARK(BM_Memory_Array);

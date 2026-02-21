@@ -207,12 +207,11 @@ TEST(PackedWordMinMax, AllSame) {
 // ============================================================
 
 TEST(PackedSet, InsertAndContains) {
-    PackedSet<8> s;
-    EXPECT_TRUE(s.empty());
+    PackedSet<8, 16> s;
+    EXPECT_EQ(s.size(), 16u); // size() returns capacity
     EXPECT_TRUE(s.insert(10));
     EXPECT_TRUE(s.insert(20));
     EXPECT_TRUE(s.insert(30));
-    EXPECT_EQ(s.size(), 3u);
     EXPECT_TRUE(s.contains(10));
     EXPECT_TRUE(s.contains(20));
     EXPECT_TRUE(s.contains(30));
@@ -220,44 +219,51 @@ TEST(PackedSet, InsertAndContains) {
 }
 
 TEST(PackedSet, NoDuplicates) {
-    PackedSet<8> s;
+    PackedSet<8, 16> s;
     EXPECT_TRUE(s.insert(5));
     EXPECT_FALSE(s.insert(5));
-    EXPECT_EQ(s.size(), 1u);
 }
 
 TEST(PackedSet, Erase) {
-    PackedSet<8> s;
+    PackedSet<8, 16> s;
     s.insert(1);
     s.insert(2);
     s.insert(3);
     EXPECT_TRUE(s.erase(2));
     EXPECT_FALSE(s.contains(2));
-    EXPECT_EQ(s.size(), 2u);
+    EXPECT_TRUE(s.contains(1));
+    EXPECT_TRUE(s.contains(3));
     EXPECT_FALSE(s.erase(2)); // already gone
 }
 
 TEST(PackedSet, SpillsToMultipleWords) {
-    PackedSet<8> s;
-    // 8-bit lanes: 8 per word. Insert 20 values -> needs 3 words.
+    // 8-bit lanes: 8 per word. Capacity 20 -> needs 3 words.
+    PackedSet<8, 20> s;
     for (uint64_t v = 1; v <= 20; ++v) {
         EXPECT_TRUE(s.insert(v));
     }
-    EXPECT_EQ(s.size(), 20u);
-    EXPECT_GE(s.word_count(), 3u);
+    EXPECT_EQ(s.word_count(), 3u);
     for (uint64_t v = 1; v <= 20; ++v) {
         EXPECT_TRUE(s.contains(v)) << "missing " << v;
     }
     EXPECT_FALSE(s.contains(21));
 }
 
+TEST(PackedSet, Full) {
+    PackedSet<8, 8> s; // exactly 1 word
+    for (uint64_t v = 1; v <= 8; ++v) {
+        EXPECT_TRUE(s.insert(v));
+    }
+    EXPECT_FALSE(s.insert(9)); // at capacity
+}
+
 TEST(PackedSet, SmallBitWidth) {
     // N=5: max_safe_value=15, lanes=12
-    PackedSet<5> s;
+    PackedSet<5, 15> s;
+    EXPECT_EQ(s.size(), 15u);
     for (uint64_t v = 1; v <= 15; ++v) {
         EXPECT_TRUE(s.insert(v));
     }
-    EXPECT_EQ(s.size(), 15u);
     for (uint64_t v = 1; v <= 15; ++v) {
         EXPECT_TRUE(s.contains(v));
     }

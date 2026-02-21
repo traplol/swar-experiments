@@ -107,6 +107,16 @@ def main():
     n_str = str(bench_n) if bench_n is not None else "?"
     sz_str = str(bench_size) if bench_size is not None else "?"
 
+    # Extract memory usage from Memory_* benchmarks
+    memory: dict[str, float] = {}
+    for bm in raw.get("benchmarks", []):
+        op, container = parse_name(bm["name"])
+        if op == "Memory" and container and "bytes" in bm:
+            memory[container] = bm["bytes"]
+
+    # Remove Memory from ops (it gets its own panel)
+    ops.pop("Memory", None)
+
     titles = {
         "Insert": f"Insert {sz_str} Elements (N={n_str})",
         "Contains": f"Contains — Hit (N={n_str}, size={sz_str})",
@@ -114,13 +124,34 @@ def main():
         "Erase": f"Erase (N={n_str}, size={sz_str})",
     }
 
-    n_ops = len(ops)
-    fig, axes = plt.subplots(n_ops, 1, figsize=(8, 3.5 * n_ops))
-    if n_ops == 1:
+    n_panels = len(ops) + (1 if memory else 0)
+    fig, axes = plt.subplots(n_panels, 1, figsize=(8, 3.5 * n_panels))
+    if n_panels == 1:
         axes = [axes]
 
     for ax, (op, data) in zip(axes, sorted(ops.items())):
         plot_operation(ax, data, titles.get(op, op))
+
+    if memory:
+        ax_mem = axes[len(ops)]
+        y = np.arange(len(CONTAINER_ORDER))
+        mem_vals = [memory.get(c, 0) for c in CONTAINER_ORDER]
+        labels = [CONTAINER_LABELS[c] for c in CONTAINER_ORDER]
+        bars = ax_mem.barh(y, mem_vals, color=COLORS, edgecolor="black", alpha=0.85)
+        ax_mem.set_yticks(y)
+        ax_mem.set_yticklabels(labels, fontsize=9)
+        ax_mem.set_xlabel("Bytes")
+        ax_mem.set_title(f"Memory Usage (N={n_str}, size={sz_str})", fontsize=11)
+        ax_mem.invert_yaxis()
+        for bar, b in zip(bars, mem_vals):
+            ax_mem.text(
+                bar.get_width(),
+                bar.get_y() + bar.get_height() / 2,
+                f"  {b:.0f}",
+                ha="left",
+                va="center",
+                fontsize=8,
+            )
 
     fig.suptitle(f"PackedSet<{n_str}> vs Standard Containers (size={sz_str})", fontsize=14)
     plt.tight_layout(rect=[0, 0, 1, 0.97])
