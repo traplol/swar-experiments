@@ -3,6 +3,7 @@
 
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -124,4 +125,6 @@ def main():
 
 if __name__ == "__main__":
     main()
-    plt.show()
+    pngs = sorted(OUTPUT_DIR.glob("*.png"))
+    if pngs:
+        subprocess.Popen(["google-chrome"] + [str(p) for p in pngs])
