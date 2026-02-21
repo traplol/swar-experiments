@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Visualize comparison benchmarks: PackedSet vs std containers."""
+"""Visualize comparison benchmarks: PackedSet vs std containers (fixed size=10)."""
 
 import json
 import re
@@ -13,15 +13,6 @@ import numpy as np
 RESULTS_DIR = Path(__file__).parent.parent / "results"
 BENCH_FILE = RESULTS_DIR / "comparison_results.json"
 
-
-def parse_name(name: str):
-    """Extract (operation, container, size) from e.g. 'BM_Insert_PackedSet/50'."""
-    m = re.match(r"BM_(\w+?)_(PackedSet|StdSet|UnorderedSet|Vector|Array)/(\d+)", name)
-    if m:
-        return m.group(1), m.group(2), int(m.group(3))
-    return None, None, None
-
-
 CONTAINER_LABELS = {
     "PackedSet": "PackedSet<11>",
     "StdSet": "std::set",
@@ -31,37 +22,43 @@ CONTAINER_LABELS = {
 }
 
 CONTAINER_ORDER = ["PackedSet", "StdSet", "UnorderedSet", "Vector", "Array"]
+COLORS = ["#2196F3", "#FF9800", "#4CAF50", "#E91E63", "#9C27B0"]
 
 
-def plot_operation(ax, op_name: str, data: dict, title: str):
-    """Plot one operation: lines per container, x=size, y=time."""
-    markers = ["o", "s", "^", "D", "v"]
-    for i, cname in enumerate(CONTAINER_ORDER):
-        if cname not in data:
-            continue
-        sizes = sorted(data[cname].keys())
-        times = [data[cname][s] for s in sizes]
-        ax.plot(
-            sizes,
-            times,
-            marker=markers[i],
-            label=CONTAINER_LABELS[cname],
-            linewidth=1.5,
-            markersize=5,
-        )
-    ax.set_xlabel("Set size")
+def parse_name(name: str):
+    """Extract (operation, container) from e.g. 'BM_Insert_PackedSet'."""
+    m = re.match(r"BM_(\w+?)_(PackedSet|StdSet|UnorderedSet|Vector|Array)$", name)
+    if m:
+        return m.group(1), m.group(2)
+    return None, None
+
+
+def plot_operation(ax, data: dict, title: str):
+    """Bar chart: one bar per container, y=time(ns)."""
+    x = np.arange(len(CONTAINER_ORDER))
+    times = [data.get(c, 0) for c in CONTAINER_ORDER]
+    labels = [CONTAINER_LABELS[c] for c in CONTAINER_ORDER]
+
+    bars = ax.bar(x, times, color=COLORS, edgecolor="black", alpha=0.85)
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, rotation=25, ha="right", fontsize=8)
     ax.set_ylabel("Time (ns)")
     ax.set_title(title)
-    ax.set_xscale("log")
-    ax.set_yscale("log")
-    ax.legend(fontsize=7)
-    ax.grid(True, alpha=0.3, which="both")
+
+    for bar, t in zip(bars, times):
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height(),
+            f"{t:.1f}",
+            ha="center",
+            va="bottom",
+            fontsize=7,
+        )
 
 
 def run_benchmark():
     """Build and run comparison_bench, writing JSON to BENCH_FILE."""
     project_root = Path(__file__).parent.parent
-    bench_bin = project_root / "build" / "comparison_bench"
 
     print("Building...")
     subprocess.run(
@@ -75,7 +72,7 @@ def run_benchmark():
     print("Running comparison_bench...\n", flush=True)
     subprocess.run(
         [
-            str(bench_bin),
+            str(project_root / "build" / "comparison_bench"),
             "--benchmark_format=console",
             f"--benchmark_out={BENCH_FILE}",
             "--benchmark_out_format=json",
@@ -91,18 +88,18 @@ def main():
     with open(BENCH_FILE) as f:
         raw = json.load(f)
 
-    # Group: ops[operation][container][size] = time_ns
-    ops: dict[str, dict[str, dict[int, float]]] = {}
+    # Group: ops[operation][container] = time_ns
+    ops: dict[str, dict[str, float]] = {}
     for bm in raw.get("benchmarks", []):
-        op, container, size = parse_name(bm["name"])
+        op, container = parse_name(bm["name"])
         if op is None:
             continue
-        ops.setdefault(op, {}).setdefault(container, {})[size] = bm["real_time"]
+        ops.setdefault(op, {})[container] = bm["real_time"]
 
     titles = {
-        "Insert": "Insert Throughput (N=11)",
-        "Contains": "Contains (hit) Latency (N=11)",
-        "ContainsMiss": "Contains (miss) Latency (N=11)",
+        "Insert": "Insert 10 Elements (N=11)",
+        "Contains": "Contains — Hit (N=11, size=10)",
+        "ContainsMiss": "Contains — Miss (N=11, size=10)",
     }
 
     fig, axes = plt.subplots(1, len(ops), figsize=(6 * len(ops), 5))
@@ -110,12 +107,11 @@ def main():
         axes = [axes]
 
     for ax, (op, data) in zip(axes, sorted(ops.items())):
-        plot_operation(ax, op, data, titles.get(op, op))
+        plot_operation(ax, data, titles.get(op, op))
 
-    fig.suptitle("PackedSet<11> vs Standard Containers", fontsize=14, y=1.02)
+    fig.suptitle("PackedSet<11> vs Standard Containers (size=10)", fontsize=14, y=1.02)
     plt.tight_layout()
 
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     out = RESULTS_DIR / "comparison.png"
     plt.savefig(out, dpi=150, bbox_inches="tight")
     print(f"Saved {out}")
