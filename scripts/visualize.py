@@ -49,7 +49,6 @@ def plot_density():
     out = OUTPUT_DIR / "density.png"
     plt.savefig(out, dpi=150)
     print(f"Saved {out}")
-    plt.close()
 
 
 def parse_bench_name(name: str):
@@ -103,7 +102,6 @@ def plot_throughput(bench_file: Path):
     out = OUTPUT_DIR / "throughput.png"
     plt.savefig(out, dpi=150)
     print(f"Saved {out}")
-    plt.close()
 
 
 def main():
@@ -126,3 +124,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    plt.show()
