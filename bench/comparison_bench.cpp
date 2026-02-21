@@ -16,7 +16,13 @@ static constexpr unsigned N = 11;
 using PW = PackedWord<N>;
 
 // Fixed set size for all benchmarks.
-static constexpr std::size_t kSize = 10;
+//static constexpr std::size_t kSize = 10;
+static constexpr std::size_t kSize = 5;
+
+// Store N and kSize in benchmark counters so visualization can read them.
+#define SET_COUNTERS(state)                                                    \
+    state.counters["N"] = N;                                                   \
+    state.counters["size"] = kSize;
 
 // ---------- Helpers ----------
 
@@ -42,8 +48,9 @@ static const auto kValsMiss = make_values(kSize, 99);
 // ============================================================
 
 static void BM_Insert_PackedSet(benchmark::State &state) {
+    SET_COUNTERS(state);
     for (auto _ : state) {
-        PackedSet<N> s;
+        PackedSet<N, kSize> s;
         for (auto v : kVals)
             s.insert(v);
         benchmark::DoNotOptimize(s);
@@ -51,6 +58,7 @@ static void BM_Insert_PackedSet(benchmark::State &state) {
 }
 
 static void BM_Insert_StdSet(benchmark::State &state) {
+    SET_COUNTERS(state);
     for (auto _ : state) {
         std::set<uint16_t> s;
         for (auto v : kVals)
@@ -60,6 +68,7 @@ static void BM_Insert_StdSet(benchmark::State &state) {
 }
 
 static void BM_Insert_UnorderedSet(benchmark::State &state) {
+    SET_COUNTERS(state);
     for (auto _ : state) {
         std::unordered_set<uint16_t> s;
         for (auto v : kVals)
@@ -69,6 +78,7 @@ static void BM_Insert_UnorderedSet(benchmark::State &state) {
 }
 
 static void BM_Insert_Vector(benchmark::State &state) {
+    SET_COUNTERS(state);
     for (auto _ : state) {
         std::vector<uint16_t> s;
         for (auto v : kVals) {
@@ -79,10 +89,25 @@ static void BM_Insert_Vector(benchmark::State &state) {
     }
 }
 
+static void BM_Insert_SortedVector(benchmark::State &state) {
+    SET_COUNTERS(state);
+    for (auto _ : state) {
+        std::vector<uint16_t> s;
+        for (auto v : kVals) {
+            auto it = std::lower_bound(s.begin(), s.end(), v);
+            if (it == s.end() || *it != v)
+                s.insert(it, v);
+        }
+        benchmark::DoNotOptimize(s);
+    }
+}
+
 static void BM_Insert_Array(benchmark::State &state) {
+    SET_COUNTERS(state);
     for (auto _ : state) {
         std::array<uint16_t, kSize> arr{};
         std::size_t count = 0;
+        benchmark::ClobberMemory();
         for (auto v : kVals) {
             bool found = false;
             for (std::size_t i = 0; i < count; ++i) {
@@ -101,7 +126,8 @@ static void BM_Insert_Array(benchmark::State &state) {
 // ============================================================
 
 static void BM_Contains_PackedSet(benchmark::State &state) {
-    PackedSet<N> s;
+    SET_COUNTERS(state);
+    PackedSet<N, kSize> s;
     for (auto v : kVals)
         s.insert(v);
     uint16_t target = kVals[kSize / 2];
@@ -112,6 +138,7 @@ static void BM_Contains_PackedSet(benchmark::State &state) {
 }
 
 static void BM_Contains_StdSet(benchmark::State &state) {
+    SET_COUNTERS(state);
     std::set<uint16_t> s(kVals.begin(), kVals.end());
     uint16_t target = kVals[kSize / 2];
     for (auto _ : state) {
@@ -121,6 +148,7 @@ static void BM_Contains_StdSet(benchmark::State &state) {
 }
 
 static void BM_Contains_UnorderedSet(benchmark::State &state) {
+    SET_COUNTERS(state);
     std::unordered_set<uint16_t> s(kVals.begin(), kVals.end());
     uint16_t target = kVals[kSize / 2];
     for (auto _ : state) {
@@ -130,6 +158,7 @@ static void BM_Contains_UnorderedSet(benchmark::State &state) {
 }
 
 static void BM_Contains_Vector(benchmark::State &state) {
+    SET_COUNTERS(state);
     std::vector<uint16_t> s(kVals.begin(), kVals.end());
     uint16_t target = kVals[kSize / 2];
     for (auto _ : state) {
@@ -138,7 +167,19 @@ static void BM_Contains_Vector(benchmark::State &state) {
     }
 }
 
+static void BM_Contains_SortedVector(benchmark::State &state) {
+    SET_COUNTERS(state);
+    std::vector<uint16_t> s(kVals.begin(), kVals.end());
+    std::sort(s.begin(), s.end());
+    uint16_t target = kVals[kSize / 2];
+    for (auto _ : state) {
+        bool found = std::binary_search(s.begin(), s.end(), target);
+        benchmark::DoNotOptimize(found);
+    }
+}
+
 static void BM_Contains_Array(benchmark::State &state) {
+    SET_COUNTERS(state);
     std::array<uint16_t, kSize> arr{};
     for (std::size_t i = 0; i < kSize; ++i)
         arr[i] = kVals[i];
@@ -157,7 +198,8 @@ static void BM_Contains_Array(benchmark::State &state) {
 // ============================================================
 
 static void BM_ContainsMiss_PackedSet(benchmark::State &state) {
-    PackedSet<N> s;
+    SET_COUNTERS(state);
+    PackedSet<N, kSize> s;
     for (auto v : kValsMiss)
         s.insert(v);
     uint16_t target = PW::max_safe_value;
@@ -169,6 +211,7 @@ static void BM_ContainsMiss_PackedSet(benchmark::State &state) {
 }
 
 static void BM_ContainsMiss_StdSet(benchmark::State &state) {
+    SET_COUNTERS(state);
     std::set<uint16_t> s(kValsMiss.begin(), kValsMiss.end());
     s.erase(PW::max_safe_value);
     for (auto _ : state) {
@@ -178,6 +221,7 @@ static void BM_ContainsMiss_StdSet(benchmark::State &state) {
 }
 
 static void BM_ContainsMiss_UnorderedSet(benchmark::State &state) {
+    SET_COUNTERS(state);
     std::unordered_set<uint16_t> s(kValsMiss.begin(), kValsMiss.end());
     s.erase(PW::max_safe_value);
     for (auto _ : state) {
@@ -187,6 +231,7 @@ static void BM_ContainsMiss_UnorderedSet(benchmark::State &state) {
 }
 
 static void BM_ContainsMiss_Vector(benchmark::State &state) {
+    SET_COUNTERS(state);
     std::vector<uint16_t> s(kValsMiss.begin(), kValsMiss.end());
     auto it = std::find(s.begin(), s.end(), static_cast<uint16_t>(PW::max_safe_value));
     if (it != s.end()) s.erase(it);
@@ -197,7 +242,20 @@ static void BM_ContainsMiss_Vector(benchmark::State &state) {
     }
 }
 
+static void BM_ContainsMiss_SortedVector(benchmark::State &state) {
+    SET_COUNTERS(state);
+    std::vector<uint16_t> s(kValsMiss.begin(), kValsMiss.end());
+    std::sort(s.begin(), s.end());
+    s.erase(std::remove(s.begin(), s.end(), static_cast<uint16_t>(PW::max_safe_value)), s.end());
+    for (auto _ : state) {
+        bool found = std::binary_search(s.begin(), s.end(),
+                                        static_cast<uint16_t>(PW::max_safe_value));
+        benchmark::DoNotOptimize(found);
+    }
+}
+
 static void BM_ContainsMiss_Array(benchmark::State &state) {
+    SET_COUNTERS(state);
     std::array<uint16_t, kSize> arr{};
     std::size_t count = 0;
     for (std::size_t i = 0; i < kSize; ++i) {
@@ -215,6 +273,94 @@ static void BM_ContainsMiss_Array(benchmark::State &state) {
 }
 
 // ============================================================
+// ERASE benchmarks — erase a known-present value from a full set
+// Each iteration rebuilds the set so we always erase from a full one.
+// ============================================================
+
+static void BM_Erase_PackedSet(benchmark::State &state) {
+    SET_COUNTERS(state);
+    uint16_t target = kVals[kSize / 2];
+    PackedSet<N, kSize> base;
+    for (auto v : kVals) base.insert(v);
+    for (auto _ : state) {
+        auto s = base;
+        bool ok = s.erase(target);
+        benchmark::DoNotOptimize(ok);
+        benchmark::DoNotOptimize(s);
+    }
+}
+
+static void BM_Erase_StdSet(benchmark::State &state) {
+    SET_COUNTERS(state);
+    uint16_t target = kVals[kSize / 2];
+    std::set<uint16_t> base(kVals.begin(), kVals.end());
+    for (auto _ : state) {
+        auto s = base;
+        auto n = s.erase(target);
+        benchmark::DoNotOptimize(n);
+        benchmark::DoNotOptimize(s);
+    }
+}
+
+static void BM_Erase_UnorderedSet(benchmark::State &state) {
+    SET_COUNTERS(state);
+    uint16_t target = kVals[kSize / 2];
+    std::unordered_set<uint16_t> base(kVals.begin(), kVals.end());
+    for (auto _ : state) {
+        auto s = base;
+        auto n = s.erase(target);
+        benchmark::DoNotOptimize(n);
+        benchmark::DoNotOptimize(s);
+    }
+}
+
+static void BM_Erase_Vector(benchmark::State &state) {
+    SET_COUNTERS(state);
+    uint16_t target = kVals[kSize / 2];
+    std::vector<uint16_t> base(kVals.begin(), kVals.end());
+    for (auto _ : state) {
+        auto s = base;
+        auto it = std::find(s.begin(), s.end(), target);
+        if (it != s.end()) s.erase(it);
+        benchmark::DoNotOptimize(s);
+    }
+}
+
+static void BM_Erase_SortedVector(benchmark::State &state) {
+    SET_COUNTERS(state);
+    uint16_t target = kVals[kSize / 2];
+    std::vector<uint16_t> base(kVals.begin(), kVals.end());
+    std::sort(base.begin(), base.end());
+    for (auto _ : state) {
+        auto s = base;
+        auto it = std::lower_bound(s.begin(), s.end(), target);
+        if (it != s.end() && *it == target) s.erase(it);
+        benchmark::DoNotOptimize(s);
+    }
+}
+
+static void BM_Erase_Array(benchmark::State &state) {
+    SET_COUNTERS(state);
+    uint16_t target = kVals[kSize / 2];
+    std::array<uint16_t, kSize> base{};
+    for (std::size_t i = 0; i < kSize; ++i) base[i] = kVals[i];
+    for (auto _ : state) {
+        auto arr = base;
+        std::size_t count = kSize;
+        benchmark::DoNotOptimize(arr.data());
+        benchmark::ClobberMemory();
+        for (std::size_t i = 0; i < count; ++i) {
+            if (arr[i] == target) {
+                arr[i] = arr[--count]; // swap-remove
+                break;
+            }
+        }
+        benchmark::DoNotOptimize(arr.data());
+        benchmark::ClobberMemory();
+    }
+}
+
+// ============================================================
 // Register all benchmarks
 // ============================================================
 
@@ -222,16 +368,26 @@ BENCHMARK(BM_Insert_PackedSet);
 BENCHMARK(BM_Insert_StdSet);
 BENCHMARK(BM_Insert_UnorderedSet);
 BENCHMARK(BM_Insert_Vector);
+BENCHMARK(BM_Insert_SortedVector);
 BENCHMARK(BM_Insert_Array);
 
 BENCHMARK(BM_Contains_PackedSet);
 BENCHMARK(BM_Contains_StdSet);
 BENCHMARK(BM_Contains_UnorderedSet);
 BENCHMARK(BM_Contains_Vector);
+BENCHMARK(BM_Contains_SortedVector);
 BENCHMARK(BM_Contains_Array);
 
 BENCHMARK(BM_ContainsMiss_PackedSet);
 BENCHMARK(BM_ContainsMiss_StdSet);
 BENCHMARK(BM_ContainsMiss_UnorderedSet);
 BENCHMARK(BM_ContainsMiss_Vector);
+BENCHMARK(BM_ContainsMiss_SortedVector);
 BENCHMARK(BM_ContainsMiss_Array);
+
+BENCHMARK(BM_Erase_PackedSet);
+BENCHMARK(BM_Erase_StdSet);
+BENCHMARK(BM_Erase_UnorderedSet);
+BENCHMARK(BM_Erase_Vector);
+BENCHMARK(BM_Erase_SortedVector);
+BENCHMARK(BM_Erase_Array);
