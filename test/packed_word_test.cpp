@@ -1,3 +1,4 @@
+#include <swar/bucketed_set.hpp>
 #include <swar/packed_set.hpp>
 #include <swar/packed_word.hpp>
 
@@ -266,5 +267,107 @@ TEST(PackedSet, SmallBitWidth) {
     }
     for (uint64_t v = 1; v <= 15; ++v) {
         EXPECT_TRUE(s.contains(v));
+    }
+}
+
+// ============================================================
+// BucketedSet
+// ============================================================
+
+TEST(BucketedSet, InsertAndContainsLowHalf) {
+    BucketedSet<10> s;
+    EXPECT_EQ(s.size(), 10u);
+    for (uint16_t v = 1; v <= 10; ++v) {
+        EXPECT_TRUE(s.insert(v));
+    }
+    for (uint16_t v = 1; v <= 10; ++v) {
+        EXPECT_TRUE(s.contains(v)) << "missing " << v;
+    }
+    EXPECT_FALSE(s.contains(100));
+}
+
+TEST(BucketedSet, InsertAndContainsHighHalf) {
+    BucketedSet<6> s;
+    // Values in [1025, 2047]
+    EXPECT_TRUE(s.insert(1025));
+    EXPECT_TRUE(s.insert(1500));
+    EXPECT_TRUE(s.insert(2047));
+    EXPECT_TRUE(s.contains(1025));
+    EXPECT_TRUE(s.contains(1500));
+    EXPECT_TRUE(s.contains(2047));
+    EXPECT_FALSE(s.contains(1026));
+}
+
+TEST(BucketedSet, Value1024) {
+    // Value 1024 has lo=0, which collides with sentinel.
+    // The +1 offset in high buckets should handle this.
+    BucketedSet<5> s;
+    EXPECT_TRUE(s.insert(1024));
+    EXPECT_TRUE(s.contains(1024));
+    EXPECT_TRUE(s.insert(1025));
+    EXPECT_TRUE(s.contains(1025));
+    EXPECT_TRUE(s.contains(1024));
+}
+
+TEST(BucketedSet, MixedLowHigh) {
+    BucketedSet<6> s;
+    EXPECT_TRUE(s.insert(1));
+    EXPECT_TRUE(s.insert(500));
+    EXPECT_TRUE(s.insert(1023));
+    EXPECT_TRUE(s.insert(1024));
+    EXPECT_TRUE(s.insert(1500));
+    EXPECT_TRUE(s.insert(2047));
+    for (uint16_t v : {1, 500, 1023, 1024, 1500, 2047}) {
+        EXPECT_TRUE(s.contains(v)) << "missing " << v;
+    }
+    EXPECT_FALSE(s.contains(2));
+    EXPECT_FALSE(s.contains(1025));
+}
+
+TEST(BucketedSet, NoDuplicates) {
+    BucketedSet<5> s;
+    EXPECT_TRUE(s.insert(42));
+    EXPECT_FALSE(s.insert(42));
+}
+
+TEST(BucketedSet, Erase) {
+    BucketedSet<5> s;
+    s.insert(1);
+    s.insert(2);
+    s.insert(3);
+    EXPECT_TRUE(s.erase(2));
+    EXPECT_FALSE(s.contains(2));
+    EXPECT_TRUE(s.contains(1));
+    EXPECT_TRUE(s.contains(3));
+    EXPECT_FALSE(s.erase(2)); // already gone
+}
+
+TEST(BucketedSet, EraseHighHalf) {
+    BucketedSet<5> s;
+    s.insert(1024);
+    s.insert(1500);
+    EXPECT_TRUE(s.erase(1024));
+    EXPECT_FALSE(s.contains(1024));
+    EXPECT_TRUE(s.contains(1500));
+}
+
+TEST(BucketedSet, Full) {
+    BucketedSet<3> s; // 1 bucket per half
+    EXPECT_TRUE(s.insert(1));
+    EXPECT_TRUE(s.insert(2));
+    EXPECT_TRUE(s.insert(3));
+    EXPECT_FALSE(s.insert(4)); // lo_buckets full
+}
+
+TEST(BucketedSet, BucketSpillover) {
+    // 6 capacity = 2 buckets per half. First bucket fills 3 lanes,
+    // 4th value should spill to second bucket.
+    BucketedSet<6> s;
+    EXPECT_TRUE(s.insert(1));
+    EXPECT_TRUE(s.insert(2));
+    EXPECT_TRUE(s.insert(3));
+    EXPECT_TRUE(s.insert(4)); // spills to 2nd bucket
+    for (uint16_t v = 1; v <= 4; ++v) {
+        EXPECT_TRUE(s.contains(v)) << "missing " << v;
     }
 }

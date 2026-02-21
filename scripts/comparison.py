@@ -15,6 +15,7 @@ BENCH_FILE = RESULTS_DIR / "comparison_results.json"
 
 CONTAINER_LABELS = {
     "PackedSet": "PackedSet<11>",
+    "BucketedSet": "BucketedSet",
     "StdSet": "std::set",
     "UnorderedSet": "std::unordered_set",
     "Vector": "std::vector",
@@ -22,13 +23,13 @@ CONTAINER_LABELS = {
     "Array": "std::array",
 }
 
-CONTAINER_ORDER = ["PackedSet", "StdSet", "UnorderedSet", "Vector", "SortedVector", "Array"]
-COLORS = ["#2196F3", "#FF9800", "#4CAF50", "#E91E63", "#673AB7", "#9C27B0"]
+CONTAINER_ORDER = ["PackedSet", "BucketedSet", "StdSet", "UnorderedSet", "Vector", "SortedVector", "Array"]
+COLORS = ["#2196F3", "#00BCD4", "#FF9800", "#4CAF50", "#E91E63", "#673AB7", "#9C27B0"]
 
 
 def parse_name(name: str):
     """Extract (operation, container) from e.g. 'BM_Insert_PackedSet'."""
-    m = re.match(r"BM_(\w+?)_(PackedSet|StdSet|UnorderedSet|SortedVector|Vector|Array)$", name)
+    m = re.match(r"BM_(\w+?)_(PackedSet|BucketedSet|StdSet|UnorderedSet|SortedVector|Vector|Array)$", name)
     if m:
         return m.group(1), m.group(2)
     return None, None

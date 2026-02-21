@@ -1,3 +1,4 @@
+#include <swar/bucketed_set.hpp>
 #include <swar/packed_set.hpp>
 #include <swar/packed_word.hpp>
 
@@ -51,6 +52,16 @@ static void BM_Insert_PackedSet(benchmark::State &state) {
     SET_COUNTERS(state);
     for (auto _ : state) {
         PackedSet<N, kSize> s;
+        for (auto v : kVals)
+            s.insert(v);
+        benchmark::DoNotOptimize(s);
+    }
+}
+
+static void BM_Insert_BucketedSet(benchmark::State &state) {
+    SET_COUNTERS(state);
+    for (auto _ : state) {
+        BucketedSet<kSize> s;
         for (auto v : kVals)
             s.insert(v);
         benchmark::DoNotOptimize(s);
@@ -137,6 +148,18 @@ static void BM_Contains_PackedSet(benchmark::State &state) {
     }
 }
 
+static void BM_Contains_BucketedSet(benchmark::State &state) {
+    SET_COUNTERS(state);
+    BucketedSet<kSize> s;
+    for (auto v : kVals)
+        s.insert(v);
+    uint16_t target = kVals[kSize / 2];
+    for (auto _ : state) {
+        bool found = s.contains(target);
+        benchmark::DoNotOptimize(found);
+    }
+}
+
 static void BM_Contains_StdSet(benchmark::State &state) {
     SET_COUNTERS(state);
     std::set<uint16_t> s(kVals.begin(), kVals.end());
@@ -203,6 +226,19 @@ static void BM_ContainsMiss_PackedSet(benchmark::State &state) {
     for (auto v : kValsMiss)
         s.insert(v);
     uint16_t target = PW::max_safe_value;
+    s.erase(target); // ensure it's absent
+    for (auto _ : state) {
+        bool found = s.contains(target);
+        benchmark::DoNotOptimize(found);
+    }
+}
+
+static void BM_ContainsMiss_BucketedSet(benchmark::State &state) {
+    SET_COUNTERS(state);
+    BucketedSet<kSize> s;
+    for (auto v : kValsMiss)
+        s.insert(v);
+    uint16_t target = BucketedSet<kSize>::max_value;
     s.erase(target); // ensure it's absent
     for (auto _ : state) {
         bool found = s.contains(target);
@@ -281,6 +317,19 @@ static void BM_Erase_PackedSet(benchmark::State &state) {
     SET_COUNTERS(state);
     uint16_t target = kVals[kSize / 2];
     PackedSet<N, kSize> base;
+    for (auto v : kVals) base.insert(v);
+    for (auto _ : state) {
+        auto s = base;
+        bool ok = s.erase(target);
+        benchmark::DoNotOptimize(ok);
+        benchmark::DoNotOptimize(s);
+    }
+}
+
+static void BM_Erase_BucketedSet(benchmark::State &state) {
+    SET_COUNTERS(state);
+    uint16_t target = kVals[kSize / 2];
+    BucketedSet<kSize> base;
     for (auto v : kVals) base.insert(v);
     for (auto _ : state) {
         auto s = base;
@@ -397,6 +446,17 @@ static void BM_Memory_PackedSet(benchmark::State &state) {
     }
 }
 
+static void BM_Memory_BucketedSet(benchmark::State &state) {
+    SET_COUNTERS(state);
+    using BS = BucketedSet<kSize>;
+    state.counters["bytes"] = sizeof(BS);
+    for (auto _ : state) {
+        BS s;
+        for (auto v : kVals) s.insert(v);
+        benchmark::DoNotOptimize(s);
+    }
+}
+
 static void BM_Memory_StdSet(benchmark::State &state) {
     SET_COUNTERS(state);
     for (auto _ : state) {
@@ -471,6 +531,7 @@ static void BM_Memory_Array(benchmark::State &state) {
 // ============================================================
 
 BENCHMARK(BM_Insert_PackedSet);
+BENCHMARK(BM_Insert_BucketedSet);
 BENCHMARK(BM_Insert_StdSet);
 BENCHMARK(BM_Insert_UnorderedSet);
 BENCHMARK(BM_Insert_Vector);
@@ -478,6 +539,7 @@ BENCHMARK(BM_Insert_SortedVector);
 BENCHMARK(BM_Insert_Array);
 
 BENCHMARK(BM_Contains_PackedSet);
+BENCHMARK(BM_Contains_BucketedSet);
 BENCHMARK(BM_Contains_StdSet);
 BENCHMARK(BM_Contains_UnorderedSet);
 BENCHMARK(BM_Contains_Vector);
@@ -485,6 +547,7 @@ BENCHMARK(BM_Contains_SortedVector);
 BENCHMARK(BM_Contains_Array);
 
 BENCHMARK(BM_ContainsMiss_PackedSet);
+BENCHMARK(BM_ContainsMiss_BucketedSet);
 BENCHMARK(BM_ContainsMiss_StdSet);
 BENCHMARK(BM_ContainsMiss_UnorderedSet);
 BENCHMARK(BM_ContainsMiss_Vector);
@@ -492,6 +555,7 @@ BENCHMARK(BM_ContainsMiss_SortedVector);
 BENCHMARK(BM_ContainsMiss_Array);
 
 BENCHMARK(BM_Erase_PackedSet);
+BENCHMARK(BM_Erase_BucketedSet);
 BENCHMARK(BM_Erase_StdSet);
 BENCHMARK(BM_Erase_UnorderedSet);
 BENCHMARK(BM_Erase_Vector);
@@ -499,6 +563,7 @@ BENCHMARK(BM_Erase_SortedVector);
 BENCHMARK(BM_Erase_Array);
 
 BENCHMARK(BM_Memory_PackedSet);
+BENCHMARK(BM_Memory_BucketedSet);
 BENCHMARK(BM_Memory_StdSet);
 BENCHMARK(BM_Memory_UnorderedSet);
 BENCHMARK(BM_Memory_Vector);

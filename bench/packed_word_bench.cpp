@@ -87,7 +87,7 @@ template <unsigned N> static void BM_Find(benchmark::State &state) {
 template <unsigned N> static void BM_SetInsert(benchmark::State &state) {
     using W = PackedWord<N>;
     for (auto _ : state) {
-        PackedSet<N> s;
+        PackedSet<N, 64> s;
         for (uint64_t v = 1;
              v <= W::max_safe_value && v <= 64; ++v) {
             s.insert(v);
@@ -100,7 +100,7 @@ template <unsigned N> static void BM_SetInsert(benchmark::State &state) {
 
 template <unsigned N> static void BM_SetContains(benchmark::State &state) {
     using W = PackedWord<N>;
-    PackedSet<N> s;
+    PackedSet<N, 64> s;
     uint64_t cap = std::min<uint64_t>(W::max_safe_value, 64);
     for (uint64_t v = 1; v <= cap; ++v)
         s.insert(v);
