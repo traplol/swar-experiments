@@ -42,3 +42,6 @@ gtest_discover_tests(swar_tests)
 # ---------- Benchmarks ----------
 add_executable(swar_bench bench/packed_word_bench.cpp)
 target_link_libraries(swar_bench PRIVATE swar benchmark::benchmark_main)
+
+add_executable(comparison_bench bench/comparison_bench.cpp)
+target_link_libraries(comparison_bench PRIVATE swar benchmark::benchmark_main)
